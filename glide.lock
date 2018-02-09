@@ -1,0 +1,152 @@
+hash: a5a361d5b9d677801f008f3f9f303eb8f7dc170d0d1e81a0d694d4f3e966ec0c
+updated: 2018-02-09T08:53:41.108211-08:00
+imports:
+- name: cloud.google.com/go
+  version: 767c40d6a2e058483c25fa193e963a22da17236d
+  subpackages:
+  - compute/metadata
+  - iam
+  - internal/optional
+  - internal/version
+  - pubsub
+  - pubsub/apiv1
+- name: github.com/AndreasBriese/bbloom
+  version: 28f7e881ca57bc00e028f9ede9f0d9104cfeef5e
+- name: github.com/dgraph-io/badger
+  version: 69611218c7078be6de16f4ea13fb256e701b6b73
+  subpackages:
+  - options
+  - protos
+  - skl
+  - table
+  - "y"
+- name: github.com/dgryski/go-farm
+  version: 2de33835d10275975374b37b2dcfd22c9020a1f5
+- name: github.com/golang/protobuf
+  version: bbd03ef6da3a115852eaf24c8a1c46aeb39aa175
+  subpackages:
+  - proto
+  - protoc-gen-go/descriptor
+  - ptypes
+  - ptypes/any
+  - ptypes/duration
+  - ptypes/empty
+  - ptypes/timestamp
+- name: github.com/googleapis/gax-go
+  version: 317e0006254c44a0ac427cc52a0e083ff0b9622f
+- name: github.com/jackc/pgx
+  version: da3231b0b66e2e74cdb779f1d46c5e958ba8be27
+  subpackages:
+  - chunkreader
+  - internal/sanitize
+  - pgio
+  - pgproto3
+  - pgtype
+- name: github.com/pkg/errors
+  version: 30136e27e2ac8d167177e8a583aa4c3fea5be833
+- name: golang.org/x/net
+  version: f5dfe339be1d06f81b22525fe34671ee7d2c8904
+  subpackages:
+  - context
+  - context/ctxhttp
+  - http2
+  - http2/hpack
+  - idna
+  - internal/timeseries
+  - lex/httplex
+  - trace
+- name: golang.org/x/oauth2
+  version: 543e37812f10c46c622c9575afd7ad22f22a12ba
+  subpackages:
+  - google
+  - internal
+  - jws
+  - jwt
+- name: golang.org/x/sync
+  version: fd80eb99c8f653c847d294a001bdf2a3a6f768f5
+  subpackages:
+  - errgroup
+  - semaphore
+- name: golang.org/x/sys
+  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: 4e4a3210bb54bb31f6ab2cdca2edcc0b50c420c1
+  subpackages:
+  - secure/bidirule
+  - transform
+  - unicode/bidi
+  - unicode/norm
+- name: google.golang.org/api
+  version: e771abbff930c1ae3c6e2c35117fc88856f11b2f
+  subpackages:
+  - googleapi/transport
+  - internal
+  - iterator
+  - option
+  - support/bundler
+  - transport
+  - transport/grpc
+  - transport/http
+- name: google.golang.org/appengine
+  version: 5bee14b453b4c71be47ec1781b0fa61c2ea182db
+  subpackages:
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+  - internal/socket
+  - internal/urlfetch
+  - socket
+  - urlfetch
+- name: google.golang.org/genproto
+  version: 2b5a72b8730b0b16380010cfe5286c42108d88e7
+  subpackages:
+  - googleapis/api/annotations
+  - googleapis/iam/v1
+  - googleapis/pubsub/v1
+  - googleapis/rpc/status
+  - protobuf/field_mask
+- name: google.golang.org/grpc
+  version: d50734d1d6ca477a72646f3022216ec39639f4cd
+  subpackages:
+  - balancer
+  - balancer/base
+  - balancer/roundrobin
+  - codes
+  - connectivity
+  - credentials
+  - credentials/oauth
+  - encoding
+  - encoding/proto
+  - grpclb/grpc_lb_v1/messages
+  - grpclog
+  - internal
+  - keepalive
+  - metadata
+  - naming
+  - peer
+  - resolver
+  - resolver/dns
+  - resolver/passthrough
+  - stats
+  - status
+  - tap
+  - transport
+testImports:
+- name: github.com/davecgh/go-spew
+  version: 87df7c60d5820d0f8ae11afede5aa52325c09717
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/stretchr/testify
+  version: 12b6f73e6084dad08a7c6e575284b177ecafbc71
+  subpackages:
+  - assert
