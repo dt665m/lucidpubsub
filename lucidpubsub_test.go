@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"log"
 	"strconv"
 	"testing"
@@ -112,49 +111,8 @@ func TestPublish(t *testing.T) {
 
 func TestMemoryQueue(t *testing.T) {
 	t.Parallel()
-
 	assert := assert.New(t)
-	ctx := context.Background()
-	client, err := pubsub.NewClient(ctx, ProjectID)
-	assert.Nil(err)
 
-	// Get Topic
-	topic := client.Topic(TopicID)
-	ok, err := topic.Exists(ctx)
-	assert.Nil(err)
-	assert.True(ok)
-
-	// Get Subscription
-	sub := client.Subscription(MemorySubscriptionID)
-	ok, err = sub.Exists(ctx)
-	assert.Nil(err)
-	assert.True(ok)
-
-	rcvdEvents := [][]byte{}
-	cctx, cancel := context.WithTimeout(ctx, time.Duration(30*time.Second))
-	handleFunc := func(bytes []byte) error {
-		rcvdEvents = append(rcvdEvents, bytes)
-		if len(rcvdEvents) == len(Events) {
-			cancel()
-		}
-		return nil
-	}
-	handler := NewMemoryQueue(handleFunc, 0)
-	err = sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
-		if err := handler.Enqueue(ctx, m); err != nil {
-			log.Printf("Queue Handler Failed: ")
-			cancel()
-		}
-	})
-
-	assert.Nil(err)
-	assert.Equal(len(Events), len(rcvdEvents))
-	for i := 0; i < len(rcvdEvents); i++ {
-		assert.True(bytes.Equal(rcvdEvents[i], Events[i].Bytes))
-	}
-}
-
-func TestMemoryQueue2(t *testing.T) {
 	ctx := context.Background()
 	client, err := pubsub.NewClient(ctx, ProjectID)
 	assert.Nil(err)
@@ -172,39 +130,37 @@ func TestMemoryQueue2(t *testing.T) {
 	assert.True(ok)
 
 	rcvdEvents := make([][]byte, 0, 1000)
-	handler := NewMemoryQueue2(0)
-	cctx, cancel := context.WithTimeout(ctx, time.Duration(30*time.Second))
+	handler := NewMemoryQueue(0)
+	cctx, cancel := context.WithTimeout(ctx, time.Duration(15*time.Second))
 	err = sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
 		seq, err := strconv.ParseInt(m.Attributes["sequence"], 10, 64)
 		if err != nil {
 			m.Nack()
-			return fmt.Errorf("Sequence Parsing Error: %v", err)
+			cancel()
+			t.Errorf("Sequence Parsing Error: %v", err)
 		}
 
 		if err := handler.Enqueue(seq, m.Data); err != nil {
-			log.Printf(err)
+			log.Print(err)
 			m.Nack()
 			cancel()
 		}
+
 		m.Ack()
 	})
 
+	log.Println("Sub Receive:", err, cctx.Err)
+
 	it := handler.NewIterator()
-	for bytes := it.Next(); bytes != nil; {
+	for it.HasNext() {
+		bytes := it.Next()
 		rcvdEvents = append(rcvdEvents, bytes)
 	}
-
-	// handleFunc := func(bytes []byte) error {
-	// 	rcvdEvents = append(rcvdEvents, bytes)
-	// 	if len(rcvdEvents) == len(Events) {
-	// 		cancel()
-	// 	}
-	// 	return nil
-	// }
 
 	assert.Nil(err)
 	assert.Equal(len(Events), len(rcvdEvents))
 	for i := 0; i < len(rcvdEvents); i++ {
+		log.Println(binary.Varint(rcvdEvents[i]))
 		assert.True(bytes.Equal(rcvdEvents[i], Events[i].Bytes))
 	}
 }

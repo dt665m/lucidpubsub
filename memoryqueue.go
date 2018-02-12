@@ -1,108 +1,103 @@
 package lucidpubsub
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"sort"
-	"strconv"
 	"sync"
-
-	"cloud.google.com/go/pubsub"
 )
-
-type PayloadHandler func([]byte) error
 
 type MemoryQueue struct {
 	mu              sync.Mutex
-	queue           map[int64]*pubsub.Message
-	dispatch        PayloadHandler
 	currentSequence int64
+	queue           map[int64][]byte
 }
 
-func NewMemoryQueue(p PayloadHandler, seedSequence int64) *MemoryQueue {
+type iterator struct {
+	*MemoryQueue
+	sortArr []int64
+	index   int
+}
+
+func (i *iterator) Next() []byte {
+	data := i.queue[i.currentSequence]
+	delete(i.queue, i.currentSequence)
+	i.currentSequence++
+	i.index++
+	return data
+}
+
+func (i *iterator) HasNext() bool {
+	return i.index < len(i.sortArr) && i.sortArr[i.index] == i.currentSequence
+}
+
+func NewMemoryQueue(seedSequence int64) *MemoryQueue {
 	return &MemoryQueue{
-		queue:           make(map[int64]*pubsub.Message),
 		currentSequence: seedSequence,
-		dispatch:        p,
+		queue:           make(map[int64][]byte),
 	}
 }
 
-func (o *MemoryQueue) Enqueue(ctx context.Context, m *pubsub.Message) error {
-	seq, err := strconv.ParseInt(m.Attributes["sequence"], 10, 64)
-	if err != nil {
-		m.Nack()
-		return fmt.Errorf("Sequence Parsing Error: %v", err)
-	}
-
-	if seq < o.currentSequence {
-		//we already handled this event
-		m.Ack()
-		return nil
-	}
-
-	//serialize access to the queue
-	o.mu.Lock()
-	o.queue[seq] = m
-	m.Ack()
+func (m *MemoryQueue) NewIterator() *iterator {
 	sortArr := []int64{}
-	for k := range o.queue {
+	for k := range m.queue {
 		sortArr = append(sortArr, k)
 	}
 	sort.Slice(sortArr, func(i, j int) bool {
 		return sortArr[i] < sortArr[j]
 	})
-
-	for _, key := range sortArr {
-		if key == o.currentSequence {
-			message := o.queue[key]
-			if err := o.dispatch(message.Data); err != nil {
-				o.mu.Unlock()
-				return err
-			}
-			delete(o.queue, key)
-			o.currentSequence++
-		} else if key > o.currentSequence {
-			break
-		}
+	return &iterator{
+		MemoryQueue: m,
+		sortArr:     sortArr,
 	}
-	o.mu.Unlock()
+}
+
+func (m *MemoryQueue) Enqueue(seq int64, data []byte) error {
+	//serialize access to the queue
+	m.mu.Lock()
+	if seq < m.currentSequence {
+		//we already handled this event
+		return errors.New("Sequence Already Handled")
+	}
+	m.queue[seq] = data
+	m.mu.Unlock()
 
 	return nil
 }
 
-func (o *MemoryQueue) LatestAck() int64 {
-	o.mu.Lock()
-	if len(o.queue) == 0 {
-		o.mu.Unlock()
-		return o.currentSequence - 1
+func (m *MemoryQueue) LatestAck() int64 {
+	m.mu.Lock()
+	if len(m.queue) == 0 {
+		m.mu.Unlock()
+		return m.currentSequence - 1
 	}
 	sortArr := []int64{}
-	for k := range o.queue {
+	for k := range m.queue {
 		sortArr = append(sortArr, k)
 	}
 	sort.Slice(sortArr, func(i, j int) bool {
 		return sortArr[i] < sortArr[j]
 	})
-	o.mu.Unlock()
+	m.mu.Unlock()
 
 	return sortArr[len(sortArr)-1]
 }
 
-func (o *MemoryQueue) Dump() {
-	o.mu.Lock()
-	if len(o.queue) == 0 {
-		o.mu.Unlock()
+func (m *MemoryQueue) Dump() {
+	m.mu.Lock()
+	if len(m.queue) == 0 {
+		m.mu.Unlock()
 		return
 	}
 
 	sortArr := []int64{}
-	for k := range o.queue {
+	for k := range m.queue {
 		sortArr = append(sortArr, k)
 	}
 	sort.Slice(sortArr, func(i, j int) bool {
 		return sortArr[i] < sortArr[j]
 	})
-	o.mu.Unlock()
+	m.mu.Unlock()
 
 	for i := 0; i < len(sortArr); i++ {
 		if i > 0 && sortArr[i] != sortArr[i-1]+1 {
