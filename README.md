@@ -4,9 +4,9 @@ Google PubSub Ordering Queue in Go.
 
 # Usage
 
-1.) Add an attribute in pubsub for the sequential index of the the published event
-2.) Receive using a context.WithTimeout on a loop.  150-350ms seems to work best
-3.) Iterate to dequeue
+1. Add an attribute in pubsub for the sequential index of the the published event
+2. Receive using a context.WithTimeout on a loop.  150-350ms seems to work best
+3. Iterate to dequeue
 
 ```go
 handler := NewMemoryQueue(0)
