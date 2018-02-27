@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	EventCount           = 10000
+	EventCount           = 1000
 	SumSeries            = ((EventCount - 1) * (EventCount)) / 2
 	ProjectID            = "testing"
 	TopicID              = "test"
@@ -115,7 +115,7 @@ func main() {
 	go publish(&wg)
 	go backup(&wg)
 
-	//process until fake crash then finish processing
+	//process until done
 	checkpoint := int64(0)
 	lastAck := int64(-1)
 	for checkpoint < EventCount-1 {
@@ -276,12 +276,7 @@ func process(lastAck int64) (int64, int64) {
 
 	// Create Event Handler
 	count := int64(0)
-	dispatcher := func(data []byte) error {
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-
+	eventHandler := func(tx *pgx.Tx, data []byte) error {
 		var checkpoint int64
 		if err := tx.QueryRow("SELECT checkpoint FROM checkpoint WHERE id=$1", RowID).Scan(&checkpoint); err != nil {
 			return fmt.Errorf("Checkpoint Query Error: %v, Rollback: %v", err, tx.Rollback())
@@ -295,7 +290,7 @@ func process(lastAck int64) (int64, int64) {
 
 		//simulate fail if we are supposed to
 		if SimulateProccessFail && simulateFailAt == integer {
-			return fmt.Errorf("Simulating Transaction Failure at: %d", integer)
+			return fmt.Errorf("Simulated Transaction Failure at: %d", integer)
 		}
 
 		_, err = tx.Exec("UPDATE checkpoint SET checkpoint=$1 WHERE id=$2", integer, RowID)
@@ -308,10 +303,9 @@ func process(lastAck int64) (int64, int64) {
 			return fmt.Errorf("Total Update Error: %v, Rollback: %v", err, tx.Rollback())
 		}
 
-		//log.Println("Processed: ", integer)
-
+		log.Println("Processed: ", integer)
 		count = integer
-		return tx.Commit()
+		return nil
 	}
 
 	//find our checkpoint
@@ -354,14 +348,20 @@ func process(lastAck int64) (int64, int64) {
 			catchupEvents = append(catchupEvents, &EventPayload{sequence, data})
 		}
 		rows.Close()
-		failSetting := SimulateProccessFail
+
 		SimulateProccessFail = false
+		tx, err := db.Begin()
+		if err != nil {
+			log.Fatal("Transaction Start Failed: ", err)
+		}
 		for _, event := range catchupEvents {
-			if err := dispatcher(event.Bytes); err != nil {
-				log.Fatalf("Dispatch Error in Catchup: %v", err)
+			if err := eventHandler(tx, event.Bytes); err != nil {
+				log.Fatalf("Dispatch Error in Catchup: %v, Rollback: %v", err, tx.Rollback())
 			}
 		}
-		SimulateProccessFail = failSetting
+		if err := tx.Commit(); err != nil {
+			log.Fatal("Transaction End Failed: ", err)
+		}
 		log.Println("Events Handled From Backup:", len(catchupEvents))
 
 		//quit early if we already finished after catchup
@@ -390,28 +390,60 @@ func process(lastAck int64) (int64, int64) {
 		log.Fatalf("Subscription Not Found: %v", TopicID)
 	}
 
-	// handle events
+	//queue and order events
 	log.Println("Processing From: ", lastAck+1)
-	handler := lucidpubsub.NewMemoryQueue(dispatcher, lastAck+1)
-	cctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	err = sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
-		if hErr := handler.Enqueue(ctx, m); hErr != nil {
-			log.Println(hErr)
-			time.Sleep(50 * time.Millisecond)
-			cancel()
+	memQueue := lucidpubsub.NewMemoryQueue(lastAck + 1)
+ListenLoop:
+	for {
+		cctx, cancel := context.WithTimeout(ctx, 150*time.Millisecond)
+		err = sub.Receive(cctx, func(ctx context.Context, m *pubsub.Message) {
+			seq, err := strconv.ParseInt(m.Attributes["sequence"], 10, 64)
+			if err != nil {
+				m.Nack()
+				cancel()
+				log.Printf("Sequence Parsing Error: %v", err)
+			}
+
+			if err := memQueue.Enqueue(seq, m.Data); err != nil {
+				log.Print(err)
+				m.Nack()
+				cancel()
+			}
+
+			m.Ack()
+		})
+		cancel()
+
+		if err != nil {
+			log.Printf("Handler Error: %v", err)
 		}
 
-		if count == EventCount-1 {
-			cancel()
+		//handle queued up events
+		tx, err := db.Begin()
+		if err != nil {
+			log.Fatal("Transaction Start Failed: ", err)
 		}
-	})
-	cancel()
-	db.Close()
+		it := memQueue.NewIterator()
+		for it.HasNext() {
+			if err := eventHandler(tx, it.Next()); err != nil {
+				//if we run into a transaction error we might break the whole thing
+				log.Printf("Event Handling Failed: %v, Rollback: %v", err, tx.Rollback())
+				break ListenLoop
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			log.Fatal("Transaction End Failed: ", err)
+		}
 
-	if err != nil || cctx.Err() != context.Canceled {
-		log.Printf("Handler Error: %v, Context: %v", err, cctx.Err())
+		cErr := ctx.Err()
+		if cErr != nil && cErr != context.DeadlineExceeded || memQueue.LatestAck() == EventCount-1 {
+			log.Println("Context: ", cErr)
+			break
+		}
 	}
-	return count, handler.LatestAck()
+
+	db.Close()
+	return count, memQueue.LatestAck()
 }
 
 func checkData() {

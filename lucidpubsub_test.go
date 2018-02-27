@@ -149,7 +149,7 @@ func TestMemoryQueue(t *testing.T) {
 		m.Ack()
 	})
 
-	log.Println("Sub Receive:", err, cctx.Err)
+	t.Logf("Sub Receive: %v, %v", err, cctx.Err)
 
 	it := handler.NewIterator()
 	for it.HasNext() {

@@ -11,6 +11,8 @@ import (
 	"github.com/dgraph-io/badger"
 )
 
+//EXPERIMENTAL, RELIABLE QUEUE
+
 const (
 	Data_Prefix byte = iota
 	Sequence_Prefix

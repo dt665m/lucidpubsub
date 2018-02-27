@@ -19,6 +19,7 @@ type iterator struct {
 	index   int
 }
 
+// Next
 func (i *iterator) Next() []byte {
 	data := i.queue[i.currentSequence]
 	delete(i.queue, i.currentSequence)
@@ -27,10 +28,12 @@ func (i *iterator) Next() []byte {
 	return data
 }
 
+// HasNext Iterate queue and returns true if available, false if empty
 func (i *iterator) HasNext() bool {
 	return i.index < len(i.sortArr) && i.sortArr[i.index] == i.currentSequence
 }
 
+// NewMemoryQueue create new MemoryQueue
 func NewMemoryQueue(seedSequence int64) *MemoryQueue {
 	return &MemoryQueue{
 		currentSequence: seedSequence,
@@ -38,6 +41,7 @@ func NewMemoryQueue(seedSequence int64) *MemoryQueue {
 	}
 }
 
+// NewIterator create new iterator on items in the queue
 func (m *MemoryQueue) NewIterator() *iterator {
 	sortArr := []int64{}
 	for k := range m.queue {
@@ -52,6 +56,7 @@ func (m *MemoryQueue) NewIterator() *iterator {
 	}
 }
 
+// Enqueue message for ordering
 func (m *MemoryQueue) Enqueue(seq int64, data []byte) error {
 	//serialize access to the queue
 	m.mu.Lock()
@@ -65,6 +70,7 @@ func (m *MemoryQueue) Enqueue(seq int64, data []byte) error {
 	return nil
 }
 
+// LatestAck get the latest item acked
 func (m *MemoryQueue) LatestAck() int64 {
 	m.mu.Lock()
 	if len(m.queue) == 0 {
@@ -83,6 +89,7 @@ func (m *MemoryQueue) LatestAck() int64 {
 	return sortArr[len(sortArr)-1]
 }
 
+// Dump debug info
 func (m *MemoryQueue) Dump() {
 	m.mu.Lock()
 	if len(m.queue) == 0 {
