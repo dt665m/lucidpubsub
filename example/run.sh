@@ -22,6 +22,4 @@ docker run --rm --name pubsub -p 8085:8085 -d google/cloud-sdk /usr/lib/google-c
 go run main.go
 
 #cleanup
-docker stop postgres 
-docker stop adminer
-docker stop pubsub
+docker stop postgres adminer pubsub
